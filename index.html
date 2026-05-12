@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1D100 判定集計ツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f0f4f8;
+    --surface: #ffffff;
+    --surface2: #e6ecf3;
+    --surface3: #d8e2ed;
+    --accent: #3a6ea8;
+    --rank1: #c04050;
+    --rank2: #3a6ea8;
+    --rank3: #7a6fa0;
+    --text: #1c2b3a;
+    --text-dim: #546578;
+    --text-dimmer: #96a8b8;
+    --border: rgba(50,90,140,0.13);
+    --border-dim: rgba(50,90,140,0.07);
+    --grid-line: rgba(50,90,140,0.05);
+    --logo-bg-from: #4a7ab5;
+    --logo-bg-to: #2d5a8e;
+    --logo-border: rgba(80,130,200,0.35);
+    --logo-shadow: rgba(50,100,180,0.15);
+    --drop-border: rgba(50,90,140,0.22);
+    --drop-glow: rgba(50,100,170,0.04);
+    --drop-hover-shadow: rgba(50,90,140,0.09);
+    --drag-over-bg: rgba(50,100,170,0.06);
+    --bar-bg: #7aadd4;
+    --bar-accent: #3a6ea8;
+    --bar1-from: #e08090;
+    --bar1-to: #c04050;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+
+  body {
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2.5rem 1rem 4rem;
+  }
+
+  /* grid texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 680px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+  .logo-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--logo-bg-from) 0%, var(--logo-bg-to) 100%);
+    border: 1px solid var(--logo-border);
+    margin-bottom: 1rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+    letter-spacing: 0.04em;
+    box-shadow: 0 0 30px var(--logo-shadow);
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.04em;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    letter-spacing: 0.02em;
+  }
+
+  /* Drop Zone */
+  #drop-zone {
+    border: 1.5px dashed var(--drop-border);
+    border-radius: var(--radius-lg);
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+  }
+  #drop-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, var(--drop-glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  #drop-zone:hover, #drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--surface2);
+    box-shadow: 0 0 0 4px var(--drop-hover-shadow);
+  }
+  #drop-zone.drag-over { background: var(--drag-over-bg); }
+
+  .drop-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.75rem;
+    color: var(--accent);
+    opacity: 0.6;
+  }
+  .drop-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .drop-sub {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+  }
+  .file-select-btn {
+    display: inline-block;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--accent);
+    background: rgba(100,80,200,0.08);
+    border: 1px solid rgba(100,80,200,0.2);
+    border-radius: 8px;
+    padding: 6px 18px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+  .file-select-btn:hover {
+    background: rgba(100,80,200,0.14);
+    border-color: var(--accent);
+  }
+
+  /* Toolbar below drop zone */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.75rem;
+    min-height: 28px;
+  }
+  .reset-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #c0392b;
+    background: rgba(192,57,43,0.07);
+    border: 1px solid rgba(192,57,43,0.2);
+    border-radius: 7px;
+    padding: 5px 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, background 0.15s, border-color 0.15s;
+  }
+  .reset-btn.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .reset-btn:hover {
+    background: rgba(192,57,43,0.13);
+    border-color: rgba(192,57,43,0.4);
+  }
+  .reset-btn svg { flex-shrink: 0; }
+
+  /* File tags */
+  #file-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 0.75rem;
+  }
+  .file-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    animation: tagIn 0.2s ease;
+  }
+  @keyframes tagIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .file-tag .icon { font-size: 13px; opacity: 0.6; }
+  .file-tag .rm {
+    cursor: pointer;
+    opacity: 0.5;
+    font-size: 14px;
+    line-height: 1;
+    transition: opacity 0.1s, color 0.1s;
+    border: none;
+    background: none;
+    color: inherit;
+    padding: 0;
+    font-family: inherit;
+  }
+  .file-tag .rm:hover { opacity: 1; color: #ff8888; }
+
+  /* Stats */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 1.5rem 0 0;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.9rem 1rem;
+    text-align: center;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .stat-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 26px;
+    font-weight: 500;
+    color: var(--accent);
+  }
+
+  /* Section heading */
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 1.75rem 0 0.75rem;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .section-head::before, .section-head::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .section-head span { padding: 0 12px; white-space: nowrap; }
+
+  /* Ranking */
+  .ranking-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--radius);
+    margin-bottom: 6px;
+    transition: border-color 0.15s, background 0.15s;
+    animation: itemIn 0.25s ease both;
+  }
+  .ranking-item:hover {
+    background: var(--surface2);
+    border-color: var(--border);
+  }
+  @keyframes itemIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .rank-pos {
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    width: 28px;
+    text-align: right;
+    flex-shrink: 0;
+    color: var(--text-dimmer);
+  }
+  .rank-pos.gold   { color: var(--rank1); font-weight: 500; }
+  .rank-pos.silver { color: var(--rank2); }
+  .rank-pos.bronze { color: var(--rank3); }
+
+  .dice-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 20px;
+    font-weight: 500;
+    width: 36px;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--text);
+  }
+  .bar-wrap {
+    flex: 1;
+    background: var(--surface3);
+    border-radius: 999px;
+    height: 8px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--bar-bg), var(--bar-accent));
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .bar-fill.gold {
+    background: linear-gradient(90deg, var(--bar1-from), var(--bar1-to));
+  }
+  .count-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text-dim);
+    min-width: 50px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .count-num strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* All results */
+  .all-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 0.5rem;
+  }
+  .pill {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: var(--text-dim);
+    transition: border-color 0.15s;
+  }
+  .pill:hover { border-color: var(--border); }
+  .pill .c { color: var(--text-dimmer); margin-left: 4px; }
+
+  /* No result */
+  .no-result {
+    text-align: center;
+    padding: 2rem 0;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 3rem;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dimmer);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo-mark">d100</div>
+    <h1>1D100 判定集計ツール</h1>
+    <p class="subtitle">ログファイルをドロップして判定結果を自動集計</p>
+  </header>
+
+  <div id="drop-zone" role="button" tabindex="0" aria-label="ログファイルをドロップするエリア">
+    <span class="drop-icon" aria-hidden="true">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    </span>
+    <p class="drop-title">ログファイルをここにドロップ</p>
+    <p class="drop-sub">複数ファイル同時対応 &nbsp;·&nbsp; HTML / TXT / LOG<br>1D100 を含む行の判定結果のみ集計します</p>
+    <label class="file-select-btn">
+      ファイルを選択
+      <input type="file" id="file-input" multiple accept=".html,.txt,.log" style="display:none;">
+    </label>
+  </div>
+
+  <div class="toolbar">
+    <div id="file-list"></div>
+    <button class="reset-btn" id="reset-btn" aria-label="ログをすべてリセット">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 1 0 1.5-3.9"/><polyline points="2,4 2,8 6,8"/></svg>
+      ログをリセット
+    </button>
+  </div>
+  <div id="results"></div>
+
+  <footer>ccfolia ログ対応 &nbsp;·&nbsp; 1D100 判定集計ツール</footer>
+</div>
+
+<script>
+const dz = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const fileList = document.getElementById('file-list');
+const resultsEl = document.getElementById('results');
+const resetBtn = document.getElementById('reset-btn');
+
+let fileMap = {};
+
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', e => { if (!dz.contains(e.relatedTarget)) dz.classList.remove('drag-over'); });
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+dz.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+fileInput.addEventListener('change', () => { handleFiles(fileInput.files); fileInput.value = ''; });
+
+resetBtn.addEventListener('click', () => {
+  fileMap = {};
+  renderFileList();
+  resultsEl.innerHTML = '';
+  resetBtn.classList.remove('visible');
+});
+
+function handleFiles(files) {
+  Array.from(files).forEach(file => {
+    if (fileMap[file.name] !== undefined) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      fileMap[file.name] = ev.target.result;
+      renderFileList();
+      aggregate();
+      resetBtn.classList.add('visible');
+    };
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+function renderFileList() {
+  fileList.innerHTML = '';
+  Object.keys(fileMap).forEach(name => {
+    const tag = document.createElement('div');
+    tag.className = 'file-tag';
+    const shortName = name.length > 30 ? name.slice(0, 28) + '…' : name;
+    tag.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span><span>${shortName}</span><button class="rm" title="削除" data-name="${name}" aria-label="${name}を削除">×</button>`;
+    fileList.appendChild(tag);
+  });
+  fileList.querySelectorAll('.rm').forEach(btn => {
+    btn.addEventListener('click', () => {
+      delete fileMap[btn.dataset.name];
+      renderFileList();
+      aggregate();
+      if (Object.keys(fileMap).length === 0) resetBtn.classList.remove('visible');
+    });
+  });
+}
+
+function stripHtml(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  return d.textContent || d.innerText || '';
+}
+
+function parseLine(line) {
+  const text = line.includes('<') ? stripHtml(line) : line;
+  if (!/1D100/i.test(text)) return null;
+  const m = text.match(/[＞>]\s*(\d+)\s*[＞>]/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  if (n < 1 || n > 100) return null;
+  return n;
+}
+
+function aggregate() {
+  const counts = {};
+  let totalRolls = 0;
+  const totalFiles = Object.keys(fileMap).length;
+
+  Object.values(fileMap).forEach(text => {
+    text.split(/\n/).forEach(line => {
+      const val = parseLine(line);
+      if (val !== null) { counts[val] = (counts[val] || 0) + 1; totalRolls++; }
+    });
+  });
+
+  if (totalFiles === 0) { resultsEl.innerHTML = ''; return; }
+  if (totalRolls === 0) {
+    resultsEl.innerHTML = `<div class="no-result">1D100 の判定結果が見つかりませんでした。</div>`;
+    return;
+  }
+
+  const uniqueVals = Object.keys(counts).length;
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const top = sorted.slice(0, 10);
+  const maxCount = top[0][1];
+  const rankLabel = ['1st', '2nd', '3rd'];
+
+  let html = `
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">合計ロール数</div><div class="stat-val">${totalRolls}</div></div>
+    <div class="stat-card"><div class="stat-label">異なる結果の種類</div><div class="stat-val">${uniqueVals}</div></div>
+    <div class="stat-card"><div class="stat-label">集計ファイル数</div><div class="stat-val">${totalFiles}</div></div>
+  </div>
+
+  <div class="section-head">
+    <span>上位 ${top.length} 件ランキング</span>
+  </div>`;
+
+  top.forEach(([val, cnt], i) => {
+    const pct = Math.round(cnt / maxCount * 100);
+    const rc = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    const label = i < 3 ? rankLabel[i] : `${i + 1}`;
+    const delay = `animation-delay:${i * 0.04}s`;
+    html += `
+    <div class="ranking-item" style="${delay}">
+      <span class="rank-pos ${rc}">${label}</span>
+      <span class="dice-num">${val}</span>
+      <div class="bar-wrap"><div class="bar-fill ${rc}" style="width:${pct}%"></div></div>
+      <span class="count-num"><strong>${cnt}</strong> 回</span>
+    </div>`;
+  });
+
+  if (sorted.length > 10) {
+    html += `<p style="font-size:12px;color:var(--text-dimmer);text-align:right;margin-top:6px;">他 ${sorted.length - 10} 種類の結果あり</p>`;
+  }
+
+  html += `<div class="section-head"><span>全結果一覧 (${sorted.length} 種類)</span></div>
+  <div class="all-pills">
+  ${sorted.map(([v, c]) => `<div class="pill">${v}<span class="c">×${c}</span></div>`).join('')}
+  </div>`;
+
+  resultsEl.innerHTML = html;
+}
+</script>
+</body>
+</html>
