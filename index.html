@@ -243,6 +243,35 @@
   }
   .file-tag .rm:hover { opacity: 1; color: #ff8888; }
 
+  /* Copy button */
+  .copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--accent);
+    background: rgba(50,90,140,0.07);
+    border: 1px solid rgba(50,90,140,0.2);
+    border-radius: 8px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    margin-top: 1rem;
+    width: 100%;
+    justify-content: center;
+  }
+  .copy-btn:hover {
+    background: rgba(50,90,140,0.13);
+    border-color: var(--accent);
+  }
+  .copy-btn.copied {
+    color: #2e7d5e;
+    background: rgba(46,125,94,0.08);
+    border-color: rgba(46,125,94,0.3);
+  }
+  .copy-btn svg { flex-shrink: 0; }
+
   /* Stats */
   .stat-grid {
     display: grid;
@@ -531,12 +560,22 @@ function aggregate() {
   const maxCount = top[0][1];
   const rankLabel = ['1st', '2nd', '3rd'];
 
+  const top3 = sorted.slice(0, 3);
+  const copyText = [
+    `総ロール数: ${totalRolls}`,
+    ...top3.map(([v, c], i) => `${i + 1}位: ${v} (${c}回)`)
+  ].join('\n');
+
   let html = `
   <div class="stat-grid">
     <div class="stat-card"><div class="stat-label">合計ロール数</div><div class="stat-val">${totalRolls}</div></div>
     <div class="stat-card"><div class="stat-label">異なる結果の種類</div><div class="stat-val">${uniqueVals}</div></div>
     <div class="stat-card"><div class="stat-label">集計ファイル数</div><div class="stat-val">${totalFiles}</div></div>
   </div>
+  <button class="copy-btn" id="copy-btn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    <span id="copy-label">総ロール数・上位3位をコピー</span>
+  </button>
 
   <div class="section-head">
     <span>上位 ${top.length} 件ランキング</span>
@@ -566,6 +605,19 @@ function aggregate() {
   </div>`;
 
   resultsEl.innerHTML = html;
+
+  const copyBtn = document.getElementById('copy-btn');
+  const copyLabel = document.getElementById('copy-label');
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(copyText).then(() => {
+      copyBtn.classList.add('copied');
+      copyLabel.textContent = 'コピーしました';
+      setTimeout(() => {
+        copyBtn.classList.remove('copied');
+        copyLabel.textContent = '総ロール数・上位3位をコピー';
+      }, 2000);
+    });
+  });
 }
 </script>
 </body>
