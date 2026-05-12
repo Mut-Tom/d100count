@@ -495,14 +495,16 @@ function stripHtml(html) {
   return d.textContent || d.innerText || '';
 }
 
-function parseLine(line) {
+function parseLines(line) {
   const text = line.includes('<') ? stripHtml(line) : line;
-  if (!/1D100/i.test(text)) return null;
-  const m = text.match(/[＞>]\s*(\d+)\s*[＞>]/);
-  if (!m) return null;
-  const n = parseInt(m[1], 10);
-  if (n < 1 || n > 100) return null;
-  return n;
+  const results = [];
+  const re = /\(1D100[^)]*\)\s*[＞>]\s*(\d+)\s*[＞>]/gi;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const n = parseInt(m[1], 10);
+    if (n >= 1 && n <= 100) results.push(n);
+  }
+  return results;
 }
 
 function aggregate() {
@@ -512,8 +514,8 @@ function aggregate() {
 
   Object.values(fileMap).forEach(text => {
     text.split(/\n/).forEach(line => {
-      const val = parseLine(line);
-      if (val !== null) { counts[val] = (counts[val] || 0) + 1; totalRolls++; }
+      const vals = parseLines(line);
+      vals.forEach(val => { counts[val] = (counts[val] || 0) + 1; totalRolls++; });
     });
   });
 
